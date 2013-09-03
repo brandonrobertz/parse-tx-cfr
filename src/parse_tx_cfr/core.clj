@@ -191,7 +191,11 @@
    a delta x and y, which are used to find one (s2) from the other (s1).
    Since situations can arrise where the strings will bring up many infomaps,
    (as in the case of a repeated header), use s1 as the string that can contain
-   many matches and s2 as a unique string. We will pick the s1 closest to s2."
+   many matches and s2 as a unique string. We will pick the s1 closest to s2.
+
+   NOTE: This will be used to generate a generic distance from a known header
+   to a value that we want. We will query the page for headers, subtract
+   a delta from the header's position to get the values we want."
   [pg s1 s2]
   (let [a (first (find-by-str pg s2)) ;unique
         b (closest a (find-by-str pg s1))]
@@ -242,6 +246,9 @@
     (region->string pg x (- y delta) width height )))
 
 ;; GENERIC
+;; This is the main search function that we will use to grab our values
+;; all that's needed is a header value of the value we want and a delta
+;; (the distance from the header to our value)
 (defn vals-by-header
   "On a given page, find a header, indicated by a match
    of head-str, and then look delta units down (positive int,
@@ -264,6 +271,18 @@
           :when (re-find #"[$][0-9]+[.,]?[0-9]+" s)]
       (nth f i))))
 
+;;;;  C O N F I G U R E  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; These functions will facilitate the automatic finding of delta values
+
+;; TODO
+;; Function(s) where we:
+;;   1. take a list of headers and example (training) values
+;;      and find the appropriate delta values, return the header
+;;      strings associated with their deltas
+;;   2. take the headers and deltas and grab all the occurences
+;;      of the values for each header in a page
+;;   3. output these grabbed values in a structured format
+
 ;;;;  M A I N  F U N C T I O N S  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; TODO
@@ -275,6 +294,7 @@
   (with-open [stream (PDFTextStream. filename)]
     (let [pg (.getPage stream 10)]
       (page->strings pg))))
+
 
 ;; for convenience in live coding:
 ;; (def pg (.getPage (PDFTextStream. "data/test.pdf") 10))
