@@ -12,6 +12,7 @@
 ;; license incompatabilities (PDFTextStream is nonredistributable).
 
 ;;;;  R E G I O N S  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn do-region
   "Adds a region with name s to our RegionOutputTarget object
@@ -45,6 +46,7 @@
     (.getRegionText tgt "lol")))
 
 ;;;;  P D F  B A S I C  U N I T S  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn blocks
   "When given a blockParent, returned by .getTextContent (usually from
@@ -72,6 +74,7 @@
     lines))
 
 ;;;;  C O N V E R S I O N  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn lines->strings
   "Take a list of lists of lines and turn it into a list of
@@ -121,6 +124,7 @@
         (flatten)))
 
 ;;;;  F I N D I N G  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; by 2-dimensional distance
 (defn dist
@@ -199,9 +203,23 @@
   [pg s1 s2]
   (let [a (first (find-by-str pg s2)) ;unique
         b (closest a (find-by-str pg s1))]
-    (println "a:" a)
-    (println "b:" b)
+    ;(println "a:" a)
+    ;(println "b:" b)
     {:dy (- (:y b) (:y a)) :dx (- (:x a) (:x b))}))
+
+(defn batch-deltas
+  "Take a page, & alist of headers and example (training) values and return the
+   appropriate delta values with their header strings.
+
+   Headers & example vals (m) are in the following format:
+   [[\"header1\" \"example value1\"]
+    ...
+    [\"headerN\" \"example valueN\"]]"
+  [pg m]
+  (for [x m
+        :let [s1 (first  x)
+              s2 (second x)]]
+    (into {:txt s1} (delta pg s1 s2))))
 
 ;;;;  G E T  S T U F F  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; These functions generally wrap the above, which are more raw tools for
@@ -211,15 +229,13 @@
   "Take a list of infomaps (or strings), representing a PDF page, and pull out
    contributor data (not contribution amount)."
   [l]
-  (remove nil?
-          (let [f (flatten l)]
-            (for [i (range (count f))
-                  ; if we're dealing with infomap, pull out txt, else string
-                  :let [s (:txt (nth f i) (nth f i))]]
-              (cond
-               (re-find #"contributor" s) (nth f (+ i 1))
-               ;(re-find #"tributor address" s) (join ", " [(nth f (+ i 1)) (nth f (+ i 2))])
-               )))))
+  (let [f (flatten l)]
+    (for [i (range (count f))
+          ; if we're dealing with infomap, pull out txt, else string
+          :let [s (:txt (nth f i) (nth f i))]]
+      (cond (re-find #"contributor" s) (nth f (+ i 1))
+            (re-find #"tributor address" s)
+              (join ", " [(nth f (+ i 1)) (nth f (+ i 2))])))))
 
 (defn contributor-headers
   "Take a list of strings or infomaps and return the contributor headers. For
@@ -243,7 +259,7 @@
               ;make these configurable in the future
               delta 20 width 200 height 10]
         :when (header-contributor? i)]
-    (region->string pg x (- y delta) width height )))
+    (region->string pg x (- y delta) width height)))
 
 ;; GENERIC
 ;; This is the main search function that we will use to grab our values
@@ -275,10 +291,12 @@
 ;; These functions will facilitate the automatic finding of delta values
 
 ;; TODO
-;; Function(s) where we:
+;; Function(s) where we (configuration):
 ;;   1. take a list of headers and example (training) values
 ;;      and find the appropriate delta values, return the header
 ;;      strings associated with their deltas
+
+;; Main fuctions:
 ;;   2. take the headers and deltas and grab all the occurences
 ;;      of the values for each header in a page
 ;;   3. output these grabbed values in a structured format
