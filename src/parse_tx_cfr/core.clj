@@ -54,6 +54,9 @@
 ;;;;                               ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;; All the disgusting java interop goes here ... waiting to be replaced
+;;; by free code.
+
 (defn blocks
   "When given a blockParent, returned by .getTextContent (usually from
    a  page), it will return a list of all of the blocks contained in
@@ -78,6 +81,21 @@
         #(for [x (range (.getTextUnitCnt %))] (.getTextUnit % x))
         line))
     lines))
+
+(defn num-pages
+  "Return the number of pages in a PDF document."
+  [stream]
+  (.getPageCnt stream))
+
+(defn get-pg
+  "Grab n page from a PDF document (a stream in this case)."
+  [stream n]
+  (.getPage stream n))
+
+(defn get-stream
+  "Get the PDF stream object."
+  [filename]
+  (PDFTextStream. filename))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -125,6 +143,7 @@
 (defn closest
   "Get closest object (infomap) in PDF infomap by Euclidean distance."
   [c m]
+  ;(do (println "c:" c) (println "m:" m) (flush)) ;DEBUG
   (apply min-key #(dist ((juxt :x :y) c) ((juxt :x :y) %)) (remove #(= c %) m)))
 
 ;;;; TRUTH ;;;;
@@ -189,7 +208,7 @@
    [[\"header1\" \"example value1\"]
     ...
     [\"headerN\" \"example valueN\"]]"
-  [pg m]
+  [m pg]
   (for [x m
         :let [s1 (first  x)
               s2 (second x)]]
@@ -200,6 +219,7 @@
 ;;;;  G E T  S T U F F  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;; These functions generally wrap the above, which are more raw tools for
 ;;; matching strings and pulling matches out of pages.
 
@@ -265,10 +285,19 @@
 ;;;;  C O N F I G U R E  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;; These functions will facilitate the configuration of what values to grab
 ;;; and allow the user to configure the program preferences easily.
-
 ;;; TODO: MAKE THESE!
+
+(defn config
+  "This is a placeholder config. For use with data/test.pdf page #10"
+  []
+  [["name of contribut"  "byron"]
+   ["utor address"      "wooten"]
+   ["amount of"            "100"]
+   ["occupat"       "accountant"]
+   ["employe"          "prophet"]])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -280,30 +309,51 @@
 ;;; Right now this is basically a placeholder. Eventually, this will
 ;;; loop through all the pages in a supplies PDF, find the proper pages
 ;;; with contributor data, and parse the tables into structured CSV.
-(defn do-pages
-  [filename]
-  (with-open [stream (PDFTextStream. filename)]
-    (let [pg (.getPage stream 10)]
-      (page->infomap pg))))
+
+(defn scrape-page
+  "Scrape data off page in PDF stream, specified by cfg."
+  [pg deltas]
+  (restruct (vals-from-deltamaps pg deltas)))
+
+(defn scrape-pages
+  [stream]
+  (let [cfg (config) ; TODO change this to a real config
+        cfg-map (get-pg stream 10)
+        deltas (batch-deltas cfg cfg-map)]
+    ;(println "cfg:" cfg)         ;DEBUG
+    ;(println "cfg-map:" cfg-map) ;DEBUG
+    ;(println "deltas:" deltas)   ;DEBUG
+    (for [n '(10 11) ;[n (range (num-pages stream))]
+          :let [pg (get-pg stream n)]]
+      (scrape-page pg deltas))))
+
+(defn do-pages-DBG
+  [stream]
+  (let [cfg (config)]
+    (for [n '(10 11)];[n (range (num-pages stream))]
+      (scrape-page stream n cfg))))
 
 ; for convenience in live coding:
 (defn testing-convenience
   "Set up some variables so that I can easily test functions."
   []
+  (def stream (get-stream "data/test.pdf"))
   ; needed for restrictions on multi-threaded use in PDFTextStream
-  (def pg (.getPage (PDFTextStream. "data/test.pdf") 10))
+  (def pg (get-pg stream 10))
   ; this is a sample config based on pg 10 in test.pdf
   (def cfg [["name of contributor" "byron"]
             ["utor address"        "wooten"]
             ["amount of"           "100"]
             ["occupation"          "accountant"]
             ["employer"            "prophet"]])
-  (def dm (batch-deltas pg cfg))
+  (def dm (batch-deltas cfg pg))
   (def vm (vals-from-deltamaps pg dm)))
+
+;(def stream (get-stream "data/test.pdf"))
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
-  (do-pages "data/test.pdf"))
+  (scrape-pages stream))
