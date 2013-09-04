@@ -1,5 +1,5 @@
 (defproject parse-tx-cfr "0.2.0-SNAPSHOT"
-  :description "FIXME: An experimental PDF parser for Texas Ethics Commission Campaign Finance Reports"
+  :description "An experimental PDF parser for Texas Ethics Commission Campaign Finance Reports"
   :url "https://github.com/brandonrobertz/Parse-TX-CFR"
   :license {:name "GPLv3+"
             :url "http://www.gnu.org/licenses/gpl-3.0.html"}
