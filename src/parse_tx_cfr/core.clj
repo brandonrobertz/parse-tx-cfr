@@ -142,8 +142,9 @@
 
 ;;; TODO
 ;;; Approximate or fuzzy matching instead of regex
-;;; possibly construct s list of commonly error-prone characters
-;;; and construct a search of these groups from a string
+;;; possibly construct a list of commonly error-prone characters
+;;; and construct a search of these groups from a string ...
+;;; or defmacro something to construct sets of regexes
 (defn str-in-map?
   "Take a string/infomap and see if it matches the given string."
   [s m]
@@ -153,7 +154,6 @@
     true
     false))
 
-;;; Helpers for finding header, value, & relationship btwn (delta)
 (defn find-by-str
   "Take a string and a page, and return the infomap(s)
    containing that string, for every match found on the page."
@@ -254,15 +254,11 @@
               h 5]]
     (vals-by-header pg txt dy dx w h)))
 
-(defn get-amounts
-  "Take a list of strings, from the PDF page, and pull out the contribution
-   about, in the order that they appear in the PDF 'DOM'."
-  [l]
-  (let [f (flatten l)]
-    (for [i (range (count f))
-          :let [s (nth f i)]
-          :when (re-find #"[$][0-9]+[.,]?[0-9]+" s)]
-      (nth f i))))
+(defn restruct
+  "Turn our one list per type of info to one-record per vector."
+  [m]
+  (map #(apply vector (identity %))
+       (partition (count m) (apply interleave m))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -274,7 +270,7 @@
 
 ;;; TODO
 ;;; Main fuctions:
-;;;   3. output these grabbed values in a structured format
+;;;   1. output these grabbed values in a structured format
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -290,24 +286,32 @@
   [filename]
   (with-open [stream (PDFTextStream. filename)]
     (let [pg (.getPage stream 10)]
-      (page->strings pg))))
-
+      (page->infomap pg))))
 
 ; for convenience in live coding:
 (defn testing-convenience
   "Set up some variables so that I can easily test functions."
   []
   ; needed for restrictions on multi-threaded use in PDFTextStream
-  (if-not (resolve 'pg)
-    ; set up a sample page for use
-    (def pg (.getPage (PDFTextStream. "data/test.pdf") 10))
-    (println "pg already defined, skipping"))
+  (def pg (.getPage (PDFTextStream. "data/test.pdf") 10))
   ; this is a sample config based on pg 10 in test.pdf
   (def cfg [["name of contributor" "byron"]
             ["utor address"        "wooten"]
             ["amount of"           "100"]])
   (def dm (batch-deltas pg cfg))
   (vals-from-deltamaps pg dm))
+
+(defn test-all
+  []
+  ; needed for restrictions on multi-threaded use in PDFTextStream
+  (let [pg (.getPage (PDFTextStream. "data/test.pdf") 10)
+        ; this is a sample config based on pg 10 in test.pdf
+        cfg [["name of contributor" "byron"]
+             ["utor address"        "wooten"]
+             ["amount of"           "100"]]
+        dm (batch-deltas pg cfg)
+        vm (vals-from-deltamaps pg dm)]
+    (restruct vm)))
 
 (defn -main
   "I don't do a whole lot ... yet."
