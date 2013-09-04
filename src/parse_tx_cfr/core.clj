@@ -6,8 +6,8 @@
   (:import [com.snowtide.pdf OutputTarget RegionOutputTarget PDFTextStream]))
 
 ;;; NOTE:
-;;; Right now I'm using snowtide's PDFTextStream library. I could and definitley
-;;; should change to Apache PDFBox of possibly iText, because of the single-
+;;; Right now I'm using snowtide's PDFTextStream library. I will
+;;; change to Apache PDFBox of possibly iText, because of the single-
 ;;; thread restrictions put on the *free* version of PDFTextStream and the
 ;;; license incompatabilities (PDFTextStream is nonredistributable).
 
@@ -85,19 +85,6 @@
 ;;;;                       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn lines->strings
-  "Take a list of lists of lines and turn it into a list of
-   rendered strings."
-  [lines]
-  (map
-    (fn [line]
-      (map
-        #(let [txt (StringBuilder. 1024)]
-          (.pipe % (OutputTarget. txt))
-          (str txt))
-        line))
-    lines))
-
 (defn lines->infomap
   "Take a list of lists of lines and turn it into a list of
    maps containing rendered strings, and their properties (like
@@ -112,15 +99,6 @@
           )
         line))
     lines))
-
-(defn page->strings
-  "Take a page and convert the structured information into lists of lists
-   of strings, representing the heriarchy of the document's structure."
-   [pg]
-   (->> (.getTextContent pg)
-        (blocks)
-        (lines)
-        (lines->strings)))
 
 (defn page->infomap
   "Take a page and convert the structured information into lists of lists
@@ -225,18 +203,6 @@
 ;;; These functions generally wrap the above, which are more raw tools for
 ;;; matching strings and pulling matches out of pages.
 
-(defn get-contributors-by-order
-  "Take a list of infomaps (or strings), representing a PDF page, and pull out
-   contributor data (not contribution amount)."
-  [l]
-  (let [f (flatten l)]
-    (for [i (range (count f))
-          ;; if we're dealing with infomap, pull out txt, else string
-          :let [s (:txt (nth f i) (nth f i))]]
-      (cond (re-find #"contributor" s) (nth f (+ i 1))
-            (re-find #"tributor address" s)
-              (join ", " [(nth f (+ i 1)) (nth f (+ i 2))])))))
-
 (defn contributor-headers
   "Take a list of strings or infomaps and return the contributor headers. For
    use with regions and the coords they provide. Assuming list is flat."
@@ -303,12 +269,11 @@
 ;;;;  C O N F I G U R E  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; These functions will facilitate the automatic finding of delta values
+;;; These functions will facilitate the configuration of what values to grab
+;;; and allow the user to configure the program preferences easily.
 
 ;;; TODO
 ;;; Main fuctions:
-;;;   2. take the headers and deltas and grab all the occurences
-;;;      of the values for each header in a page
 ;;;   3. output these grabbed values in a structured format
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -329,10 +294,20 @@
 
 
 ; for convenience in live coding:
-; (def pg (.getPage (PDFTextStream. "data/test.pdf") 10))
-; (def dm (batch-deltas pg [["name of contributor" "byron"] ["utor address" "wooten"]]))
-; (vals-from-deltamaps pg dm)
-;(vals-from-deltamaps pg (batch-deltas pg [["name of contributor" "byron"] ["utor address" "wooten"]]))
+(defn testing-convenience
+  "Set up some variables so that I can easily test functions."
+  []
+  ; needed for restrictions on multi-threaded use in PDFTextStream
+  (if-not (resolve 'pg)
+    ; set up a sample page for use
+    (def pg (.getPage (PDFTextStream. "data/test.pdf") 10))
+    (println "pg already defined, skipping"))
+  ; this is a sample config based on pg 10 in test.pdf
+  (def cfg [["name of contributor" "byron"]
+            ["utor address"        "wooten"]
+            ["amount of"           "100"]])
+  (def dm (batch-deltas pg cfg))
+  (vals-from-deltamaps pg dm))
 
 (defn -main
   "I don't do a whole lot ... yet."
