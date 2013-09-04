@@ -268,9 +268,7 @@
 ;;; These functions will facilitate the configuration of what values to grab
 ;;; and allow the user to configure the program preferences easily.
 
-;;; TODO
-;;; Main fuctions:
-;;;   1. output these grabbed values in a structured format
+;;; TODO: MAKE THESE!
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -297,21 +295,11 @@
   ; this is a sample config based on pg 10 in test.pdf
   (def cfg [["name of contributor" "byron"]
             ["utor address"        "wooten"]
-            ["amount of"           "100"]])
+            ["amount of"           "100"]
+            ["occupation"          "accountant"]
+            ["employer"            "prophet"]])
   (def dm (batch-deltas pg cfg))
-  (vals-from-deltamaps pg dm))
-
-(defn test-all
-  []
-  ; needed for restrictions on multi-threaded use in PDFTextStream
-  (let [pg (.getPage (PDFTextStream. "data/test.pdf") 10)
-        ; this is a sample config based on pg 10 in test.pdf
-        cfg [["name of contributor" "byron"]
-             ["utor address"        "wooten"]
-             ["amount of"           "100"]]
-        dm (batch-deltas pg cfg)
-        vm (vals-from-deltamaps pg dm)]
-    (restruct vm)))
+  (def vm (vals-from-deltamaps pg dm)))
 
 (defn -main
   "I don't do a whole lot ... yet."
