@@ -1,5 +1,5 @@
-;;;; (c) 2013 Bradon Robertz ... RIP EWOK
-;;;; GPLv3+ license
+;;;; (c) 2013 Bradon Robertz ... RIP EWOK VDB
+;;;; GPLv3+ (I'm considering Snowtide PDFTextStream a system lib for now)
 (ns parse-tx-cfr.core
   (:gen-class)
   (:require [clojure.string :refer [join]])
