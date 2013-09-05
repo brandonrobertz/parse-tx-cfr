@@ -275,10 +275,16 @@
     (vals-by-header pg txt dy dx w h)))
 
 (defn restruct
-  "Turn our one list per type of info to one-record per vector."
+  "Turn our one list per type of info to one-list per page, containing
+   one vector per record."
   [m]
   (map #(apply vector (identity %))
        (partition (count m) (apply interleave m))))
+
+(defn join-pages
+  "Turn our one list w/ vectors per page to one long vector list."
+  [l]
+  (filter vector? (tree-seq seq? identity l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -323,9 +329,9 @@
     ;(println "cfg:" cfg)         ;DEBUG
     ;(println "cfg-map:" cfg-map) ;DEBUG
     ;(println "deltas:" deltas)   ;DEBUG
-    (for [n '(10 11) ;[n (range (num-pages stream))]
-          :let [pg (get-pg stream n)]]
-      (scrape-page pg deltas))))
+    (join-pages (for [n '(10 43) ;[n (range (num-pages stream))]
+                      :let [pg (get-pg stream n)]]
+                  (scrape-page pg deltas)))))
 
 (defn do-pages-DBG
   [stream]
@@ -333,23 +339,11 @@
     (for [n '(10 11)];[n (range (num-pages stream))]
       (scrape-page stream n cfg))))
 
-; for convenience in live coding:
-(defn testing-convenience
-  "Set up some variables so that I can easily test functions."
-  []
-  (def stream (get-stream "data/test.pdf"))
-  ; needed for restrictions on multi-threaded use in PDFTextStream
-  (def pg (get-pg stream 10))
-  ; this is a sample config based on pg 10 in test.pdf
-  (def cfg [["name of contributor" "byron"]
-            ["utor address"        "wooten"]
-            ["amount of"           "100"]
-            ["occupation"          "accountant"]
-            ["employer"            "prophet"]])
-  (def dm (batch-deltas cfg pg))
-  (def vm (vals-from-deltamaps pg dm)))
-
-;(def stream (get-stream "data/test.pdf"))
+; for convenience in coding ... due to multiproc restrictions
+; w/ snowtide, it's easier to use a global instance
+(if (boolean (resolve 'stream))
+  (println "stream already defined, skipping...")
+  (def stream (get-stream "data/test.pdf")))
 
 (defn -main
   "I don't do a whole lot ... yet."
