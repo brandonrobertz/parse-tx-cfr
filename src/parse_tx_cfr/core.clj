@@ -2,8 +2,11 @@
 ;;;; GPLv3+ (I'm considering Snowtide PDFTextStream a system lib for now)
 (ns parse-tx-cfr.core
   (:gen-class)
+  (:use [parse-tx-cfr similarity])
   (:require [clojure.string :refer [join]])
-  (:import [com.snowtide.pdf OutputTarget RegionOutputTarget PDFTextStream]))
+  (:import [com.snowtide.pdf OutputTarget RegionOutputTarget PDFTextStream
+            Page]
+           [com.snowtide.pdf.layout BlockParent Block Line]))
 
 ;;; NOTE:
 ;;; Right now I'm using snowtide's PDFTextStream library. I will
@@ -20,7 +23,7 @@
 (defn do-region
   "Adds a region with name s to our RegionOutputTarget object
    tgt. Specify x, y, w, and h."
-  [tgt x y w h s]
+  [^RegionOutputTarget tgt x y w h s]
   (.addRegion tgt x y w h s))
 
 (defn do-regions
@@ -29,7 +32,7 @@
    [{:name 'cool1' :x 100 :y 100 :w 100 :h 10}
       ...
     {:name 'coolN' :x 200 :y 100 :w 100 :h 10}]"
-  [tgt m]
+  [^RegionOutputTarget tgt m]
   (doseq [i m]
     (let [s (:name i)
           x (:x i)
@@ -42,8 +45,8 @@
   "When given an area to look, region->string will grab
    the information contained inside that area in a list
    of strings."
-  [pg x y w h]
-  (let [tgt (RegionOutputTarget.)]
+  [^Page pg x y w h]
+  (let [^RegionOutputTarget tgt (RegionOutputTarget.)]
     (do-region tgt x y w h "lol")
     (.pipe pg tgt)
     (.getRegionText tgt "lol")))
@@ -61,7 +64,7 @@
   "When given a blockParent, returned by .getTextContent (usually from
    a  page), it will return a list of all of the blocks contained in
    that blockParent."
-  [block-parent]
+  [^BlockParent block-parent]
   (for [x (range (.getChildCnt block-parent))]
     (.getChild block-parent x)))
 
@@ -69,7 +72,7 @@
   "For a list of blocks, this function will return a list of lines for
    each block in the list."
   [blocks]
-  (map #(for [x (range (.getLineCnt %))] (.getLine % x)) blocks))
+  (map #(for [x (range (.getLineCnt ^Block %))] (.getLine ^Block % x)) blocks))
 
 (defn text-units
   "Takes a list of text units (possibly 2-dimensional, list of lists of
@@ -78,23 +81,23 @@
   (map
     (fn [line]
       (map
-        #(for [x (range (.getTextUnitCnt %))] (.getTextUnit % x))
+        #(for [x (range (.getTextUnitCnt ^Line %))] (.getTextUnit ^Line % x))
         line))
     lines))
 
 (defn num-pages
   "Return the number of pages in a PDF document."
-  [stream]
+  [^PDFTextStream stream]
   (.getPageCnt stream))
 
 (defn get-pg
   "Grab n page from a PDF document (a stream in this case)."
-  [stream n]
+  [^PDFTextStream stream n]
   (.getPage stream n))
 
 (defn get-stream
   "Get the PDF stream object."
-  [filename]
+  [^String filename]
   (PDFTextStream. filename))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -112,16 +115,17 @@
     (fn [line]
       (map
         #(let [txt (StringBuilder. 1024)]
-          (.pipe % (OutputTarget. txt))
-          {:txt (str txt) :x (.xpos %) :y (.ypos %)}
-          )
+          (.pipe ^Line % (OutputTarget. txt))
+          {:txt (str txt)
+           :x (.xpos ^Line %)
+           :y (.ypos ^Line %)})
         line))
     lines))
 
 (defn page->infomap
   "Take a page and convert the structured information into lists of lists
    of strings, representing the heriarchy of the document's structure."
-   [pg]
+   [^Page pg]
    (->> (.getTextContent pg)
         (blocks)
         (lines)
@@ -134,11 +138,18 @@
 ;;;;                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;
+(defn pnlz
+  "Square the first item of a vector."
+  [c]
+  (vector (first c) (* (second c) (second c))))
+
 ;;; by 2-dimensional distance
 (defn dist
-  "Euclidean distance for two collections, assumed x y pairs."
+  "Euclidean distance for two collections, assumed x y pairs. I penalize
+   y distance, making it more important."
   [c1 c2]
-  (->> (map - c1 c2) (map #(* % %)) (reduce +)))
+  (->> (map - (pnlz c1) (pnlz c2)) (map #(* % %)) (reduce +)))
 
 (defn closest
   "Get closest object (infomap) in PDF infomap by Euclidean distance."
@@ -164,15 +175,47 @@
 ;;; possibly construct a list of commonly error-prone characters
 ;;; and construct a search of these groups from a string ...
 ;;; or defmacro something to construct sets of regexes
+
+;; Approximate (best) matching ;;
+(defn str-in-map-fuzzy
+  "Take a string and infomap/string and return their dice-similarity
+  (for approximate matching)."
+  [s m]
+  ;(println " -----------")
+  ;(println "s:" s)
+  ;(println "m:" (:txt m))
+  ;(println "sim:" (similarity s (:txt m m)))
+  (similarity s (:txt m m)))
+
+(defn sim-map
+  "Take a page and a desired string to match, and generate
+   a list of infomaps of :txt, :x, :y, and :sim (similarity)."
+  [pg s]
+  (for [i (page->infomap pg)]
+    (into i {:sim (str-in-map-fuzzy s i)})))
+
+;; approximate
+(defn find-by-str-fuzzy
+  "Take a page and do a fuzzy search for the top n matches on the page."
+  [pg s n]
+  ;(println "--------------")
+  ;(println "s:" s)
+  ;(println "fbsf:" (take n (sort-by :sim > (sim-map pg s))))
+  (take n (sort-by :sim > (sim-map pg s))))
+
+;;                        ;;
+;; EXACT (regex) matching ;;
+;;                        ;;
 (defn str-in-map?
   "Take a string/infomap and see if it matches the given string."
-  [s m]
+  [^String s m]
   ;; right now, we're just normalizing spaces and case
   (if (re-find (re-pattern (.toUpperCase s))
                (.toUpperCase (clojure.string/replace (:txt m m) #"\s+" " ")))
     true
     false))
 
+;; EXACT (picks matches based on binary truth) MATCHING
 (defn find-by-str
   "Take a string and a page, and return the infomap(s)
    containing that string, for every match found on the page."
@@ -200,6 +243,13 @@
         b (closest a (find-by-str pg s1))]
     {:dy (- (:y b) (:y a)) :dx (:x a)}))
 
+(defn delta-fuzzy
+  "Generate delta values, using fuzzy string matching."
+  [pg cfg s1 s2]
+  (let [a (first (find-by-str-fuzzy pg s2 1)) ;unique
+        b (closest a (find-by-str-fuzzy pg s1 (:recs-per-pg cfg)))]
+    {:dy (- (:y b) (:y a)) :dx (:x a)}))
+
 (defn batch-deltas
   "Take a page & a list of headers and example (training) values and return the
    appropriate delta values with their header strings.
@@ -208,11 +258,13 @@
    [[\"header1\" \"example value1\"]
     ...
     [\"headerN\" \"example valueN\"]]"
-  [m pg]
-  (for [x m
+  [cfg pg]
+  (for [x (:cfg cfg)
         :let [s1 (first  x)
-              s2 (second x)]]
-    (into {:txt s1} (delta pg s1 s2))))
+              s2 (second x)
+              n (:recs-per-pg cfg)]]
+    ;NOTE just plugged in fuzzy matching here, can remove here 2
+    (into {:txt s1} (delta-fuzzy pg cfg s1 s2))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -261,18 +313,25 @@
         :when (str-in-map? head-str i)]
     (region->string pg dx (- y dy) w h)))
 
+(defn vals-by-header-fuzzy
+  "Same as above, but do it with fuzzy string matching."
+  [pg cfg head-str dy dx w h]
+  (for [i (sort-by :y > (find-by-str-fuzzy pg head-str (:recs-per-pg cfg)))
+        :let [y (:y i)]]
+    (region->string pg dx (- y dy) w h)))
+
 (defn vals-from-deltamaps
   "Take a list of delta maps, resulting from a call to batch-deltas,
    and search a given page for the values pointed at by the header/delta
    pairs."
-  [pg m]
+  [pg cfg m]
   (for [x m
         :let [txt (:txt x)
               dy  (:dy  x)
               dx  (:dx  x)
               w 200
               h 5]]
-    (vals-by-header pg txt dy dx w h)))
+    (vals-by-header-fuzzy pg cfg txt dy dx w h)))
 
 (defn restruct
   "Turn our one list per type of info to one-list per page, containing
@@ -299,11 +358,13 @@
 (defn config
   "This is a placeholder config. For use with data/test.pdf page #10"
   []
-  [["name of contribut"  "byron"]
-   ["utor address"      "wooten"]
-   ["amount of"            "100"]
-   ["occupat"       "accountant"]
-   ["employe"          "prophet"]])
+  {:recs-per-pg 5
+   :cfg [["Full name of contributor"  "Byron, Bruce"]
+         ["Contributor address"  "5801 Tom Wooten Drive "]
+         ["Amount of contribution ($)"  "$350.00"]
+         ["Principal occupation / Job title (See Instructions)"  "McQueary Henry Bowles Troy"]
+         ["Employer (See Instructions)" "Portfolio Accountant"]
+         ]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -318,26 +379,22 @@
 
 (defn scrape-page
   "Scrape data off page in PDF stream, specified by cfg."
-  [pg deltas]
-  (restruct (vals-from-deltamaps pg deltas)))
+  [pg cfg deltas]
+  (restruct (vals-from-deltamaps pg cfg deltas)))
 
 (defn scrape-pages
   [stream]
-  (let [cfg (config) ; TODO change this to a real config
-        cfg-map (get-pg stream 10)
-        deltas (batch-deltas cfg cfg-map)]
+  (let [cfg        (config) ; TODO change this to a real config
+        example-pg (get-pg stream 10)
+        deltas     (batch-deltas cfg example-pg)]
     ;(println "cfg:" cfg)         ;DEBUG
     ;(println "cfg-map:" cfg-map) ;DEBUG
     ;(println "deltas:" deltas)   ;DEBUG
-    (join-pages (for [n '(10 43) ;[n (range (num-pages stream))]
-                      :let [pg (get-pg stream n)]]
-                  (scrape-page pg deltas)))))
-
-(defn do-pages-DBG
-  [stream]
-  (let [cfg (config)]
-    (for [n '(10 11)];[n (range (num-pages stream))]
-      (scrape-page stream n cfg))))
+    ;(join-pages) wrap below
+    ;(println "###### GETTING DATA ######")
+    (for [n '(10) ;[n (range (num-pages stream))]
+             :let [pg (get-pg stream n)]]
+         (scrape-page pg cfg deltas))))
 
 ; for convenience in coding ... due to multiproc restrictions
 ; w/ snowtide, it's easier to use a global instance
@@ -351,3 +408,46 @@
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
   (scrape-pages stream))
+
+(defn tezt [] (closest {:txt "$100.00" :x 408.96, :y 341.64, :sim 1.0}
+                       '({:txt "         Amount of   In-kind contribution,"
+                          :x 364.4677
+                          :y 262.44
+                          :sim 0.8}
+                         {:txt "   Amount of           In-kind contribution,"
+                          :x 367.18777
+                          :y 147.24
+                          :sim 0.8}
+                         {:txt " 1     Amount of        In-kind contribution,"
+                          :x 363.406
+                          :y 493.92
+                          :sim 0.7804878048780488}
+                         {:txt " 7    Amount of    | 8     In-kind contribution,"
+                          :x 384.12
+                          :y 609.48
+                          :sim 0.7619047619047619}
+                         {:txt " flD#      Amount of     In-kind contribution,"
+                          :x 320.15378
+                          :y 378.0
+                          :sim 0.7441860465116279})))
+
+(def mt '({:txt "         Amount of          In-kind contribution,"
+            :x 364.4677
+            :y 262.44
+            :sim 0.8}
+           {:txt "            Amount of           In-kind contribution,"
+            :x 367.18777
+            :y 147.24
+            :sim 0.8}
+           {:txt " 1           Amount of           In-kind contribution,"
+            :x 363.406
+            :y 493.92
+            :sim 0.7804878048780488}
+           {:txt " 7    Amount of      | 8        In-kind contribution,"
+            :x 384.12
+            :y 609.48
+            :sim 0.7619047619047619}
+           {:txt " flD#      Amount of      |            In-kind contribution,"
+            :x 320.15378
+            :y 378.0
+            :sim 0.7441860465116279}))
