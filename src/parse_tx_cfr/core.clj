@@ -4,8 +4,8 @@
   (:gen-class)
   (:use [parse-tx-cfr similarity])
   (:require [clojure.string :refer [join]])
-  (:import [com.snowtide.pdf OutputTarget RegionOutputTarget PDFTextStream
-            Page]
+  (:import [com.snowtide.pdf OutputTarget RegionOutputTarget
+                             PDFTextStream Page]
            [com.snowtide.pdf.layout BlockParent Block Line]))
 
 ;;; NOTE:
@@ -356,6 +356,8 @@
    :config-page 10
    :cfg [["Full name of contributor"    "Byron, Bruce"]
          ["Contributor address"         "5801 Tom Wooten Drive "]
+         ["Contributor address"         "Ste. 300"]
+         ["Contributor address"         "Houston, TX 77056"]
          ["Amount of contribution ($)"  "$350.00"]
          ["Principal occupation / Job title (See Instructions)"
           "McQueary Henry Bowles Troy"]
