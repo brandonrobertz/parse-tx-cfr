@@ -140,7 +140,7 @@
 
 ;;
 (defn pnlz
-  "Square the first item of a vector."
+  "Square the first item of a vector. Used to penalize."
   [c]
   (vector (first c) (* (second c) (second c))))
 
@@ -181,10 +181,6 @@
   "Take a string and infomap/string and return their dice-similarity
   (for approximate matching)."
   [s m]
-  ;(println " -----------")
-  ;(println "s:" s)
-  ;(println "m:" (:txt m))
-  ;(println "sim:" (similarity s (:txt m m)))
   (similarity s (:txt m m)))
 
 (defn sim-map
@@ -198,9 +194,6 @@
 (defn find-by-str-fuzzy
   "Take a page and do a fuzzy search for the top n matches on the page."
   [pg s n]
-  ;(println "--------------")
-  ;(println "s:" s)
-  ;(println "fbsf:" (take n (sort-by :sim > (sim-map pg s))))
   (take n (sort-by :sim > (sim-map pg s))))
 
 ;;                        ;;
@@ -353,29 +346,26 @@
 
 ;;; These functions will facilitate the configuration of what values to grab
 ;;; and allow the user to configure the program preferences easily.
-;;; TODO: MAKE THESE!
+;;; TODO: MAKE THESE! I'm thinking a swing interface that displays the PDF
+;;; "DOM" and lets the user click on & select the lines to use as examples.
 
 (defn config
   "This is a placeholder config. For use with data/test.pdf page #10"
   []
   {:recs-per-pg 5
-   :cfg [["Full name of contributor"  "Byron, Bruce"]
-         ["Contributor address"  "5801 Tom Wooten Drive "]
+   :config-page 10
+   :cfg [["Full name of contributor"    "Byron, Bruce"]
+         ["Contributor address"         "5801 Tom Wooten Drive "]
          ["Amount of contribution ($)"  "$350.00"]
-         ["Principal occupation / Job title (See Instructions)"  "McQueary Henry Bowles Troy"]
-         ["Employer (See Instructions)" "Portfolio Accountant"]
-         ]})
+         ["Principal occupation / Job title (See Instructions)"
+          "McQueary Henry Bowles Troy"]
+         ["Employer (See Instructions)" "Portfolio Accountant"]]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  M A I N  F U N C T I O N S  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;; TODO
-;;; Right now this is basically a placeholder. Eventually, this will
-;;; loop through all the pages in a supplies PDF, find the proper pages
-;;; with contributor data, and parse the tables into structured CSV.
 
 (defn scrape-page
   "Scrape data off page in PDF stream, specified by cfg."
@@ -384,17 +374,13 @@
 
 (defn scrape-pages
   [stream]
-  (let [cfg        (config) ; TODO change this to a real config
-        example-pg (get-pg stream 10)
+  (let [cfg        (config)
+        example-pg (get-pg stream (:config-page cfg))
         deltas     (batch-deltas cfg example-pg)]
-    ;(println "cfg:" cfg)         ;DEBUG
-    ;(println "cfg-map:" cfg-map) ;DEBUG
-    ;(println "deltas:" deltas)   ;DEBUG
-    ;(join-pages) wrap below
-    ;(println "###### GETTING DATA ######")
-    (for [n '(10) ;[n (range (num-pages stream))]
-             :let [pg (get-pg stream n)]]
-         (scrape-page pg cfg deltas))))
+    (join-pages
+     (for [n '(10 11) ;[n (range (num-pages stream))]
+           :let [pg (get-pg stream n)]]
+       (scrape-page pg cfg deltas)))))
 
 ; for convenience in coding ... due to multiproc restrictions
 ; w/ snowtide, it's easier to use a global instance
@@ -408,46 +394,3 @@
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
   (scrape-pages stream))
-
-(defn tezt [] (closest {:txt "$100.00" :x 408.96, :y 341.64, :sim 1.0}
-                       '({:txt "         Amount of   In-kind contribution,"
-                          :x 364.4677
-                          :y 262.44
-                          :sim 0.8}
-                         {:txt "   Amount of           In-kind contribution,"
-                          :x 367.18777
-                          :y 147.24
-                          :sim 0.8}
-                         {:txt " 1     Amount of        In-kind contribution,"
-                          :x 363.406
-                          :y 493.92
-                          :sim 0.7804878048780488}
-                         {:txt " 7    Amount of    | 8     In-kind contribution,"
-                          :x 384.12
-                          :y 609.48
-                          :sim 0.7619047619047619}
-                         {:txt " flD#      Amount of     In-kind contribution,"
-                          :x 320.15378
-                          :y 378.0
-                          :sim 0.7441860465116279})))
-
-(def mt '({:txt "         Amount of          In-kind contribution,"
-            :x 364.4677
-            :y 262.44
-            :sim 0.8}
-           {:txt "            Amount of           In-kind contribution,"
-            :x 367.18777
-            :y 147.24
-            :sim 0.8}
-           {:txt " 1           Amount of           In-kind contribution,"
-            :x 363.406
-            :y 493.92
-            :sim 0.7804878048780488}
-           {:txt " 7    Amount of      | 8        In-kind contribution,"
-            :x 384.12
-            :y 609.48
-            :sim 0.7619047619047619}
-           {:txt " flD#      Amount of      |            In-kind contribution,"
-            :x 320.15378
-            :y 378.0
-            :sim 0.7441860465116279}))
