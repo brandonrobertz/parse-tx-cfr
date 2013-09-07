@@ -74,6 +74,14 @@
             shorter distance y over x."
     (is (> (dist [100 200] [50 220]) (dist [100 200] [100 210])))))
 
+(deftest test-matching
+  (testing "Make sure that our matcher does fuzzy matching correctly."
+    (is (= "Amount of      |            In-kind contribution"
+           (re-find #"Amount of.*contribution"
+                    (:txt (first (find-by-str-fuzzy
+                                  (get-pg stream 10)
+                                  "Am0unt 0f\tcontr1but10n" 1))))))))
+
 (deftest test-delta-x
   (testing "Make sure the delta x values are correct."
     (is (= 1265.3978424072266 (reduce + (sort (map :dx (make-delta))))))))

@@ -196,9 +196,7 @@
   [pg s n]
   (take n (sort-by :sim > (sim-map pg s))))
 
-;;                        ;;
 ;; EXACT (regex) matching ;;
-;;                        ;;
 (defn str-in-map?
   "Take a string/infomap and see if it matches the given string."
   [^String s m]
