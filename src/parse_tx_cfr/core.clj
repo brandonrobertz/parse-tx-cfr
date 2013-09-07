@@ -149,7 +149,7 @@
   "Euclidean distance for two collections, assumed x y pairs. I penalize
    y distance, making it more important."
   [c1 c2]
-  (->> (map - (pnlz c1) (pnlz c2)) (map #(* % %)) (reduce +)))
+  (->> (map - (pnlz c1) (pnlz c2)) (map #(* % %)) (reduce +) (. Math sqrt)))
 
 (defn closest
   "Get closest object (infomap) in PDF infomap by Euclidean distance."
@@ -359,9 +359,9 @@
          ["Contributor address"         "Ste. 300"]
          ["Contributor address"         "Houston, TX 77056"]
          ["Amount of contribution ($)"  "$350.00"]
+         ["Employer (See Instructions)" "Portfolio Accountant"]
          ["Principal occupation / Job title (See Instructions)"
-          "McQueary Henry Bowles Troy"]
-         ["Employer (See Instructions)" "Portfolio Accountant"]]})
+          "McQueary Henry Bowles Troy"]]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -386,9 +386,9 @@
 
 ; for convenience in coding ... due to multiproc restrictions
 ; w/ snowtide, it's easier to use a global instance
-(if (boolean (resolve 'stream))
-  (println "stream already defined, skipping...")
-  (def stream (get-stream "data/test.pdf")))
+(try
+  (def stream (get-stream "data/test.pdf"))
+  (catch Exception e (println "stream already defined")))
 
 (defn -main
   "I don't do a whole lot ... yet."
