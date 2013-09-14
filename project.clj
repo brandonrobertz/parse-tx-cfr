@@ -1,4 +1,4 @@
-(defproject parse-tx-cfr "0.2.0-SNAPSHOT"
+(defproject parse-tx-cfr "0.3.0-SNAPSHOT"
   :description "An experimental PDF parser for Texas Ethics Commission Campaign Finance Reports"
   :url "https://github.com/brandonrobertz/Parse-TX-CFR"
   :license {:name "GPLv3+"

@@ -344,8 +344,8 @@
 
 ;;; These functions will facilitate the configuration of what values to grab
 ;;; and allow the user to configure the program preferences easily.
-;;; TODO: MAKE THESE! I'm thinking a swing interface that displays the PDF
-;;; "DOM" and lets the user click on & select the lines to use as examples.
+;;; TODO: MAKE THESE! I'm thinking a swing (seesaw) interface that displays the
+;;; PDF "DOM" and lets the user click on & select the lines to use as examples.
 
 (defn config
   "This is a placeholder config. For use with data/test.pdf page #10"
@@ -378,7 +378,10 @@
         example-pg (get-pg stream (:config-page cfg))
         deltas     (batch-deltas cfg example-pg)]
     (join-pages
-     (for [n '(10 11) ;[n (range (num-pages stream))]
+     (for [n (range 3 45) ;replace this with user-defined args
+           ;; n (range (num-pages stream))
+           ;; n (10 11) ;test case WORKS error-free
+           ;; [n (range (num-pages stream))]
            :let [pg (get-pg stream n)]]
        (scrape-page pg cfg deltas)))))
 
