@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Parse-TX-CFR
 
 An experimental parser for PDF Campaign Finance Reports from the Texas Ethics Commission.
@@ -18,3 +19,9 @@ There are incompatabilities between GPL and Snowtide's PDFTextStream license (pr
 Copyright © 2013 Brandon Robertz
 GPLv3+ (w/ considering PDFTextStream a system lib)
 RIP EWOK BATES
+=======
+parse-tx-cfr
+============
+
+An experimental parser for TX Ethics Comission Campaign Finance Reports
+>>>>>>> d50701170380450c10606e6f86a7e622382c3a70
