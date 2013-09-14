@@ -10,7 +10,7 @@ Right now you have to edit the source to modify which pages it scrapes. Currentl
     $ cd parse-tx-cfr
     $ lein run
 
-Running it will give you a list of vectors, each of which contains the information from a contributor cell in `data/test.pdf`. I don't clean up the output or convert it to a delimited format. As you can see, it's fairly accurate as it, with the exception of some line breaks.
+Running it will give you a list of vectors, each of which contains the information from a contributor cell in `data/test.pdf`. I don't clean up the output or convert it to a delimited format. As you can see, it's fairly accurate as-is, with the exception of some line breaks and formatting oddities.
 
 ## License
 
