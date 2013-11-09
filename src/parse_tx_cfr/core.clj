@@ -3,7 +3,9 @@
 (ns parse-tx-cfr.core
   (:gen-class)
   (:use [parse-tx-cfr similarity])
-  (:require [clojure.string :refer [join]])
+  (:require [clojure.string :as string]
+            [clojure.data.csv :as csv]
+            [clojure.java.io :as io])
   (:import [com.snowtide.pdf OutputTarget RegionOutputTarget
                              PDFTextStream Page]
            [com.snowtide.pdf.layout BlockParent Block Line]))
@@ -351,44 +353,65 @@
   "This is a placeholder config. For use with data/test.pdf page #10"
   []
   {:recs-per-pg 5
-   :config-page 10
-   :cfg [["Full name of contributor"    "Byron, Bruce"]
-         ["Contributor address"         "5801 Tom Wooten Drive "]
-         ["Contributor address"         "Ste. 300"]
-         ["Contributor address"         "Houston, TX 77056"]
+   :config-page 2
+   :cfg [["Full name of contributor"    "Acuna, Gerard"]
+         ["Contributor address"         "PO Box 26499"]
+         ["Contributor address"         "Austin, TX 78755-0499"]
          ["Amount of contribution ($)"  "$350.00"]
-         ["Employer (See Instructions)" "Portfolio Accountant"]
+         ["Employer (See Instructions)" "TRI Recycling Inc"]
          ["Principal occupation / Job title (See Instructions)"
-          "McQueary Henry Bowles Troy"]]})
+          "President"]]})
+
+;;;;  W R I T E  2  C S V  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn clean-up
+  [scraped-info amount-col-num]
+  (map #(map-indexed (fn [i s]
+                       (if (= i amount-col-num)
+                         (string/upper-case
+                          (string/replace
+                           (string/trim-newline
+                            (string/trim
+                             (string/replace s #"\." "."))) #"[^0-9.]" ""))
+                         (string/upper-case
+                          (string/trim-newline
+                           (string/trim
+                            (string/replace s #"[^A-Za-z0-9 -,. ]" ""))))))
+                     %)
+       scraped-info))
+
+(defn write-out
+  [filename data]
+  (with-open [out-file (io/writer filename)]
+    (csv/write-csv out-file data)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  M A I N  F U N C T I O N S  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defn scrape-page
   "Scrape data off page in PDF stream, specified by cfg."
   [pg cfg deltas]
   (restruct (vals-from-deltamaps pg cfg deltas)))
 
 (defn scrape-pages
-  [stream]
+  [stream start end]
   (let [cfg        (config)
         example-pg (get-pg stream (:config-page cfg))
         deltas     (batch-deltas cfg example-pg)]
     (join-pages
-     (for [n (range 3 45) ;replace this with user-defined args
+     (for [n (range start end)
            ;; n (range (num-pages stream))
            ;; n (10 11) ;test case WORKS error-free
            ;; [n (range (num-pages stream))]
-           :let [pg (get-pg stream n)]]
+           :let [nil1 (println "Extracting contributors on page" n)
+                 pg (get-pg stream n)]]
        (scrape-page pg cfg deltas)))))
 
 ; for convenience in coding ... due to multiproc restrictions
 ; w/ snowtide, it's easier to use a global instance
 (try
-  (def stream (get-stream "data/test.pdf"))
+  (def stream (get-stream "data/2012CFRpts.pdf"))
   (catch Exception e (println "stream already defined")))
 
 (defn -main
@@ -396,4 +419,13 @@
   [& args]
   ;; work around dangerous default behaviour in Clojure
   (alter-var-root #'*read-eval* (constantly false))
-  (scrape-pages stream))
+  (demo))
+
+;;;; LEE LEFFINGWELL DEMONSTRATION ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn demo []
+  (write-out "/home/uzr/Desktop/leff-scraped.csv"
+             (concat (clean-up (scrape-pages stream   2  56) 3)
+                     (clean-up (scrape-pages stream  70 181) 3)
+                     (clean-up (scrape-pages stream 211 255) 3)
+                     (clean-up (scrape-pages stream 278 296) 3))))
